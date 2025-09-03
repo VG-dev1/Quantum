@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Downloads</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-app-region: drag;
+            user-select: none;
+            overflow: hidden;
+        }
+        .drag-region { -webkit-app-region: drag; }
+        .no-drag-region { -webkit-app-region: no-drag; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 rounded-lg shadow-lg">
+    <div class="flex justify-between items-center mb-4 drag-region">
+        <h2 class="text-lg font-bold">Downloads</h2>
+        <button id="close-downloads-btn" class="no-drag-region text-gray-500 hover:text-gray-700 transition-all">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    
+    <div id="downloads-list" class="flex flex-col gap-2 overflow-y-auto no-scrollbar" style="max-height: calc(100vh - 150px);">
+        </div>
+    
+    <button id="clear-all-downloads-btn" class="no-drag-region mt-4 w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors">
+        Clear All
+    </button>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const clearAllBtn = document.getElementById('clear-all-downloads-btn');
+            const downloadsList = document.getElementById('downloads-list');
+            const closeDownloadsBtn = document.getElementById('close-downloads-btn');
+
+            clearAllBtn.addEventListener('click', () => {
+                window.electronAPI.clearAllDownloads();
+            });
+
+            closeDownloadsBtn.addEventListener('click', () => {
+                window.electronAPI.closeDownloadsWindow();
+            });
+
+            const formatBytes = (bytes, decimals = 2) => {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const dm = decimals < 0 ? 0 : decimals;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+            };
+
+            const createDownloadItemHTML = (item) => {
+                let statusText;
+                let progress = 0;
+                let controlsHtml = '';
+
+                if (item.totalBytes > 0) {
+                    progress = (item.receivedBytes / item.totalBytes) * 100;
+                }
+
+                switch (item.state) {
+                    case 'progressing':
+                        statusText = `Downloading... (${formatBytes(item.receivedBytes)} / ${formatBytes(item.totalBytes)})`;
+                        controlsHtml = `
+                            <button class="control-btn pause-btn text-gray-500 hover:text-blue-500 transition-colors text-xs ml-2">
+                                <i class="fa-solid fa-pause"></i>
+                            </button>
+                            <button class="control-btn cancel-btn text-gray-500 hover:text-red-500 transition-colors text-xs">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        `;
+                        break;
+                    case 'paused':
+                        statusText = `Paused (${formatBytes(item.receivedBytes)} / ${formatBytes(item.totalBytes)})`;
+                        controlsHtml = `
+                            <button class="control-btn resume-btn text-gray-500 hover:text-green-500 transition-colors text-xs ml-2">
+                                <i class="fa-solid fa-play"></i>
+                            </button>
+                            <button class="control-btn cancel-btn text-gray-500 hover:text-red-500 transition-colors text-xs">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        `;
+                        break;
+                    case 'completed':
+                        statusText = `Completed! (${formatBytes(item.totalBytes)})`;
+                        controlsHtml = `
+                            <button class="control-btn show-in-folder-btn text-gray-500 hover:text-blue-500 transition-colors text-xs ml-2">
+                                <i class="fa-solid fa-folder-open"></i>
+                            </button>
+                        `;
+                        break;
+                    case 'cancelled':
+                        statusText = `Cancelled`;
+                        break;
+                    case 'interrupted':
+                        statusText = `Interrupted`;
+                        break;
+                }
+
+                return `
+                    <div class="flex items-center justify-between p-2 bg-gray-200 rounded-md">
+                        <div class="flex-grow flex flex-col">
+                            <span class="text-sm font-medium truncate">${item.filename}</span>
+                            <span class="text-xs text-gray-600">${statusText}</span>
+                            ${item.state === 'progressing' || item.state === 'paused' ? `<div class="w-full bg-gray-300 rounded-full h-1.5 mt-1">
+                                <div class="bg-blue-500 h-1.5 rounded-full" style="width: ${progress}%;"></div>
+                            </div>` : ''}
+                        </div>
+                        <div class="flex-shrink-0 flex items-center gap-1 no-drag-region">
+                            ${controlsHtml}
+                            <button class="remove-download-item-btn text-gray-500 hover:text-red-500 transition-colors text-xs ml-1">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            };
+
+            window.electronAPI.onUpdateDownloads((event, downloads) => {
+                downloadsList.innerHTML = '';
+                downloads.reverse().forEach(item => {
+                    const downloadItemDiv = document.createElement('div');
+                    downloadItemDiv.innerHTML = createDownloadItemHTML(item);
+                    
+                    const pauseBtn = downloadItemDiv.querySelector('.pause-btn');
+                    if (pauseBtn) {
+                        pauseBtn.addEventListener('click', () => {
+                            window.electronAPI.pauseDownload(item.id);
+                        });
+                    }
+
+                    const resumeBtn = downloadItemDiv.querySelector('.resume-btn');
+                    if (resumeBtn) {
+                        resumeBtn.addEventListener('click', () => {
+                            window.electronAPI.resumeDownload(item.id);
+                        });
+                    }
+
+                    const cancelBtn = downloadItemDiv.querySelector('.cancel-btn');
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', () => {
+                            window.electronAPI.cancelDownload(item.id);
+                        });
+                    }
+
+                    const showInFolderBtn = downloadItemDiv.querySelector('.show-in-folder-btn');
+                    if (showInFolderBtn) {
+                        showInFolderBtn.addEventListener('click', () => {
+                            window.electronAPI.showDownloadInFolder(item.path);
+                        });
+                    }
+                    
+                    const removeBtn = downloadItemDiv.querySelector('.remove-download-item-btn');
+                    if (removeBtn) {
+                        removeBtn.addEventListener('click', () => {
+                            window.electronAPI.removeDownloadItem(item.id);
+                        });
+                    }
+                    
+                    downloadsList.appendChild(downloadItemDiv.firstElementChild);
+                });
+            });
+            
+            // Listener for "File not found" alerts
+            window.electronAPI.onShowAlert((event, message) => {
+                alert(message);
+            });
+
+            window.electronAPI.requestDownloads();
+        });
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+</body>
+</html>

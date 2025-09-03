@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Browser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            overflow: hidden;
+        }
+        .drag-region { -webkit-app-region: drag; }
+        .no-drag-region { -webkit-app-region: no-drag; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        webview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col h-screen p-2 no-drag-region">
+    
+    <div class="title-bar flex justify-end h-8 drag-region">
+        <div class="no-drag-region flex items-center gap-2 pr-2">
+            <button id="minimize-btn" class="w-4 h-4 rounded-full bg-gray-400 hover:bg-gray-500 transition-colors"></button>
+            <button id="maximize-btn" class="w-4 h-4 rounded-full bg-gray-400 hover:bg-gray-500 transition-colors"></button>
+            <button id="close-btn" class="w-4 h-4 rounded-full bg-red-400 hover:bg-red-500 transition-colors"></button>
+        </div>
+    </div>
+    
+    <div class="top-ui-container flex flex-col h-20 bg-white rounded-lg shadow-md drag-region">
+        <div class="tab-bar flex items-center h-8 no-drag-region overflow-x-auto no-scrollbar pb-2">
+            <div id="tabs-container" class="flex items-center gap-1"></div>
+            <button id="new-tab-btn" class="no-drag-region flex-shrink-0 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-full w-8 h-8 flex items-center justify-center text-xl font-bold ml-2 transition-all">+</button>
+        </div>
+        <div class="url-bar-container flex items-center h-8 p-1 gap-2 border-t border-gray-200 mt-1 no-drag-region">
+            <input type="text" id="url-bar" placeholder="Enter URL or search term" class="flex-grow p-2 text-sm bg-gray-100 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+        </div>
+    </div>
+    
+    <div class="main-content flex-grow flex flex-row items-stretch mt-2 no-drag-region">
+        <div class="flex-grow flex flex-col">
+            <div id="browser-view-container" class="flex-grow relative w-full"></div>
+        </div>
+        
+        <div class="sidebar flex flex-col items-center justify-start w-16 p-2 bg-white rounded-lg shadow-md ml-2 no-drag-region">
+            <button id="back-btn" class="sidebar-btn flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-2">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <button id="forward-btn" class="sidebar-btn flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-2">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+            <button id="refresh-btn" class="sidebar-btn flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all mb-2">
+                <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+            <button id="home-btn" class="sidebar-btn flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all mb-2">
+                <i class="fa-solid fa-house"></i>
+            </button>
+            
+            <button id="bookmark-btn" class="sidebar-btn flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all mb-2">
+                <i class="fa-solid fa-bookmark"></i>
+            </button>
+            
+            <button id="history-btn" class="sidebar-btn flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all mb-2">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </button>
+
+            <button id="downloads-btn" class="sidebar-btn flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all mb-2">
+                <i class="fa-solid fa-download"></i>
+            </button>
+
+            <button id="toggle-devtools-btn" class="sidebar-btn flex items-center justify-center w-12 h-12 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all mb-2">
+                <i class="fa-solid fa-code"></i>
+            </button>
+        </div>
+    </div>
+    
+    <div id="bookmark-dropdown" class="absolute w-64 bg-white border border-gray-200 rounded-lg shadow-xl p-2 z-50 hidden no-drag-region">
+        <div id="bookmark-list" class="flex flex-col gap-1">
+            <button id="add-bookmark-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2">
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Add current page</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <script src="../renderer.js"></script>
+</body>
+</html>
